@@ -36,6 +36,7 @@
 #ifndef _DEV_VT_VT_H_
 #define	_DEV_VT_VT_H_
 
+#include <sys/types.h>
 #include <sys/param.h>
 #include <sys/_lock.h>
 #include <sys/_mutex.h>

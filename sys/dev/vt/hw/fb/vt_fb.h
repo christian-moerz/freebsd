@@ -32,6 +32,9 @@
 
 #ifndef _DEV_VT_HW_FB_VT_FB_H_
 #define	_DEV_VT_HW_FB_VT_FB_H_
+
+#include <dev/vt/vt.h>
+
 /* Generic framebuffer interface call vt_fb_attach to init VT(9) */
 int vt_fb_attach(struct fb_info *info);
 void vt_fb_resume(struct vt_device *vd);
