@@ -210,11 +210,23 @@ vt_fb_drawrect(struct vt_device *vd, int x1, int y1, int x2, int y2, int fill,
 
 	for (y = y1; y <= y2; y++) {
 		if (fill || (y == y1) || (y == y2)) {
-			for (x = x1; x <= x2; x++)
-				vt_fb_setpixel(vd, x, y, color);
+			for (x = x1; x <= x2; x++) {
+				if (vd->vd_driver && vd->vd_driver->vd_setpixel) {
+					vd->vd_driver->vd_setpixel(vd, x, y, color);
+				} else {
+					printf("vt_fb: invalid vd_driver->vd_setpixel\n");
+					vt_fb_setpixel(vd, x, y, color);
+				}
+			}
 		} else {
-			vt_fb_setpixel(vd, x1, y, color);
-			vt_fb_setpixel(vd, x2, y, color);
+			if (vd->vd_driver && vd->vd_driver->vd_setpixel) {
+				vd->vd_driver->vd_setpixel(vd, x1, y, color);
+				vd->vd_driver->vd_setpixel(vd, x2, y, color);
+			} else {
+				printf("vt_fb: invalid vd_driver->vd_setpixel\n");
+				vt_fb_setpixel(vd, x1, y, color);
+				vt_fb_setpixel(vd, x2, y, color);
+			}
 		}
 	}
 }
@@ -563,7 +575,6 @@ vt_fb_detach(struct fb_info *info)
 void
 vt_fb_suspend(struct vt_device *vd)
 {
-
 	vt_suspend(vd);
 }
 
