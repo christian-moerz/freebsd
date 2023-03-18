@@ -370,10 +370,17 @@ vt_fb_bitblt_text(struct vt_device *vd, const struct vt_window *vw,
 			    vd->vd_drawnbg && (vd->vd_drawnbg[z] == bg))
 				continue;
 
-			/* rely on driver instead of direct call, so we can make
-			   use of a more generic implementation in drm-kmod */
-			vd->vd_driver->vd_bitblt_bmp(vd, vw, pattern, NULL,
-											vf->vf_width, vf->vf_height, x, y, fg, bg);
+			if ((NULL == vd->vd_driver) ||
+				(NULL == vd->vd_driver->vd_bitblt_bmp)) {
+
+					printf("vt_fb: uninitialized vd_driver->vd_bitblt_bmp\n");
+					vt_fb_bitblt_bitmap(vd, vw, pattern, NULL, vf->vf_width, vf->vf_height, x, y, fg, bg);
+			} else {
+				/* rely on driver instead of direct call, so we can make
+			   	use of a more generic implementation in drm-kmod */
+				vd->vd_driver->vd_bitblt_bmp(vd, vw, pattern, NULL,
+												vf->vf_width, vf->vf_height, x, y, fg, bg);
+			}
 
 			if (vd->vd_drawn)
 				vd->vd_drawn[z] = c;
@@ -396,13 +403,24 @@ vt_fb_bitblt_text(struct vt_device *vd, const struct vt_window *vw,
 	drawn_area.tr_end.tp_row = area->tr_end.tp_row * vf->vf_height;
 
 	if (vt_is_cursor_in_area(vd, &drawn_area)) {
-		/* again, make use of generic call instead to simplify drm-kmod */
-		vd->vd_driver->vd_bitblt_bmp(vd, vw,
-			vd->vd_mcursor->map, vd->vd_mcursor->mask,
-			vd->vd_mcursor->width, vd->vd_mcursor->height,
-		    vd->vd_mx_drawn + vw->vw_draw_area.tr_begin.tp_col,
-		    vd->vd_my_drawn + vw->vw_draw_area.tr_begin.tp_row,
-		    vd->vd_mcursor_fg, vd->vd_mcursor_bg);
+		if ((NULL == vd->vd_driver) ||
+			(NULL == vd->vd_driver->vd_bitblt_bmp)) {
+			printf("vt_fb: uninitialized vd_driver->vd_bitblt_bmp\n");
+			vt_fb_bitblt_bitmap(vd, vw,
+				vd->vd_mcursor->map, vd->vd_mcursor->mask,
+				vd->vd_mcursor->width, vd->vd_mcursor->height,
+				vd->vd_mx_drawn + vw->vw_draw_area.tr_begin.tp_col,
+				vd->vd_my_drawn + vw->vw_draw_area.tr_begin.tp_row,
+				vd->vd_mcursor_fg, vd->vd_mcursor_bg);
+		})else {
+			/* again, make use of generic call instead to simplify drm-kmod */
+			vd->vd_driver->vd_bitblt_bmp(vd, vw,
+				vd->vd_mcursor->map, vd->vd_mcursor->mask,
+				vd->vd_mcursor->width, vd->vd_mcursor->height,
+				vd->vd_mx_drawn + vw->vw_draw_area.tr_begin.tp_col,
+				vd->vd_my_drawn + vw->vw_draw_area.tr_begin.tp_row,
+				vd->vd_mcursor_fg, vd->vd_mcursor_bg);
+		}
 	}
 #endif
 }
@@ -504,7 +522,13 @@ vt_fb_init(struct vt_device *vd)
 	vd->vd_driver->vd_blank(vd, c);
 
 	/* Wakeup screen. KMS need this. */
-	vd->vd_driver->vd_postswitch(vd);
+	if ((NULL == vd->vd_driver) ||
+		(NULL == vd->vd_driver->vd_postswitch)) {
+		printf("vt_fb: uninitialized vd_driver->vd_postswitch\n");
+		vt_fb_postswitch(vd);
+	})else {
+		vd->vd_driver->vd_postswitch(vd);
+	}
 
 	return (CN_INTERNAL);
 }
