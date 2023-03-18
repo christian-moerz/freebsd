@@ -373,7 +373,7 @@ vt_fb_bitblt_text(struct vt_device *vd, const struct vt_window *vw,
 			/* rely on driver instead of direct call, so we can make
 			   use of a more generic implementation in drm-kmod */
 			vd->vd_driver->vd_bitblt_bmp(vd, vw, pattern, NULL,
-											vf->vf_width, vf->vf_height, x, y, fg, bg);)
+											vf->vf_width, vf->vf_height, x, y, fg, bg);
 
 			if (vd->vd_drawn)
 				vd->vd_drawn[z] = c;
