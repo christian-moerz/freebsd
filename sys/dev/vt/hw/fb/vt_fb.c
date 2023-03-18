@@ -412,7 +412,7 @@ vt_fb_bitblt_text(struct vt_device *vd, const struct vt_window *vw,
 				vd->vd_mx_drawn + vw->vw_draw_area.tr_begin.tp_col,
 				vd->vd_my_drawn + vw->vw_draw_area.tr_begin.tp_row,
 				vd->vd_mcursor_fg, vd->vd_mcursor_bg);
-		})else {
+		} else {
 			/* again, make use of generic call instead to simplify drm-kmod */
 			vd->vd_driver->vd_bitblt_bmp(vd, vw,
 				vd->vd_mcursor->map, vd->vd_mcursor->mask,
@@ -526,7 +526,7 @@ vt_fb_init(struct vt_device *vd)
 		(NULL == vd->vd_driver->vd_postswitch)) {
 		printf("vt_fb: uninitialized vd_driver->vd_postswitch\n");
 		vt_fb_postswitch(vd);
-	})else {
+	} else {
 		vd->vd_driver->vd_postswitch(vd);
 	}
 
