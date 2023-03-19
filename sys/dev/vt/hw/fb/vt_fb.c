@@ -536,9 +536,14 @@ vt_fb_init(struct vt_device *vd)
 	/* Wakeup screen. KMS need this. */
 	if ((NULL == vd->vd_driver) ||
 		(NULL == vd->vd_driver->vd_postswitch)) {
+		
 		printf("vt_fb: uninitialized vd_driver->vd_postswitch\n");
 		vt_fb_postswitch(vd);
 	} else {
+		if (vd->vd_driver->vd_postswitch != vt_fb_postswitch) {
+			printf("vt_fb: postswitch vtable not going to vt_fb_postswitch\n");
+		}
+
 		vd->vd_driver->vd_postswitch(vd);
 	}
 
