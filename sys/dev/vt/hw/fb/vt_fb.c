@@ -55,7 +55,7 @@ static struct vt_driver vt_fb_driver = {
 	.vd_drawrect = vt_fb_drawrect,
 	.vd_setpixel = vt_fb_setpixel,
 	.vd_postswitch = vt_fb_postswitch,
-	.vd_priority = VD_PRIORITY_GENERIC+10,
+	.vd_priority = VD_PRIORITY_GENERIC + 10,
 	.vd_fb_ioctl = vt_fb_ioctl,
 	.vd_fb_mmap = vt_fb_mmap,
 	.vd_suspend = vt_fb_suspend,
@@ -69,7 +69,7 @@ vt_fb_mem_wr1(struct fb_info *sc, uint32_t o, uint8_t v)
 {
 
 	KASSERT((o < sc->fb_size), ("Offset %#08x out of fb size", o));
-	*(uint8_t *)(sc->fb_vbase + o) = v;
+	*(uint8_t *) (sc->fb_vbase + o) = v;
 }
 
 static void
@@ -77,7 +77,7 @@ vt_fb_mem_wr2(struct fb_info *sc, uint32_t o, uint16_t v)
 {
 
 	KASSERT((o < sc->fb_size), ("Offset %#08x out of fb size", o));
-	*(uint16_t *)(sc->fb_vbase + o) = v;
+	*(uint16_t *) (sc->fb_vbase + o) = v;
 }
 
 static void
@@ -85,14 +85,14 @@ vt_fb_mem_wr4(struct fb_info *sc, uint32_t o, uint32_t v)
 {
 
 	KASSERT((o < sc->fb_size), ("Offset %#08x out of fb size", o));
-	*(uint32_t *)(sc->fb_vbase + o) = v;
+	*(uint32_t *) (sc->fb_vbase + o) = v;
 }
 
 int
 vt_fb_ioctl(struct vt_device *vd, u_long cmd, caddr_t data, struct thread *td)
 {
 	struct fb_info *info;
-	int error = 0;
+	int		error = 0;
 
 	info = vd->vd_softc;
 
@@ -102,16 +102,16 @@ vt_fb_ioctl(struct vt_device *vd, u_long cmd, caddr_t data, struct thread *td)
 		break;
 
 	case FBIO_GETWINORG:	/* get frame buffer window origin */
-		*(u_int *)data = 0;
+		*(u_int *) data = 0;
 		break;
 
 	case FBIO_GETDISPSTART:	/* get display start address */
-		((video_display_start_t *)data)->x = 0;
-		((video_display_start_t *)data)->y = 0;
+		((video_display_start_t *) data)->x = 0;
+		((video_display_start_t *) data)->y = 0;
 		break;
 
 	case FBIO_GETLINEWIDTH:	/* get scan line width in bytes */
-		*(u_int *)data = info->fb_stride;
+		*(u_int *) data = info->fb_stride;
 		break;
 
 	case FBIO_BLANK:	/* blank display */
@@ -125,7 +125,7 @@ vt_fb_ioctl(struct vt_device *vd, u_long cmd, caddr_t data, struct thread *td)
 		    info->fb_rgboffs.blue == 0)
 			return (ENOTTY);
 		memcpy((struct fb_rgboffs *)data, &info->fb_rgboffs,
-		    sizeof(struct fb_rgboffs));
+		       sizeof(struct fb_rgboffs));
 		break;
 
 	default:
@@ -137,8 +137,8 @@ vt_fb_ioctl(struct vt_device *vd, u_long cmd, caddr_t data, struct thread *td)
 }
 
 int
-vt_fb_mmap(struct vt_device *vd, vm_ooffset_t offset, vm_paddr_t *paddr,
-    int prot, vm_memattr_t *memattr)
+vt_fb_mmap(struct vt_device *vd, vm_ooffset_t offset, vm_paddr_t * paddr,
+	   int prot, vm_memattr_t * memattr)
 {
 	struct fb_info *info;
 
@@ -149,7 +149,7 @@ vt_fb_mmap(struct vt_device *vd, vm_ooffset_t offset, vm_paddr_t *paddr,
 
 	if (offset < info->fb_size) {
 		if (info->fb_pbase == 0) {
-			*paddr = vtophys((uint8_t *)info->fb_vbase + offset);
+			*paddr = vtophys((uint8_t *) info->fb_vbase + offset);
 		} else {
 			*paddr = info->fb_pbase + offset;
 			if (info->fb_flags & FB_FLAG_MEMATTR)
@@ -169,8 +169,8 @@ void
 vt_fb_setpixel(struct vt_device *vd, int x, int y, term_color_t color)
 {
 	struct fb_info *info;
-	uint32_t c;
-	u_int o;
+	uint32_t	c;
+	u_int		o;
 
 	info = vd->vd_softc;
 	c = info->fb_cmap[color];
@@ -204,9 +204,9 @@ vt_fb_setpixel(struct vt_device *vd, int x, int y, term_color_t color)
 
 void
 vt_fb_drawrect(struct vt_device *vd, int x1, int y1, int x2, int y2, int fill,
-    term_color_t color)
+	       term_color_t color)
 {
-	int x, y;
+	int		x, y;
 
 	for (y = y1; y <= y2; y++) {
 		if (fill || (y == y1) || (y == y2)) {
@@ -235,8 +235,8 @@ void
 vt_fb_blank(struct vt_device *vd, term_color_t color)
 {
 	struct fb_info *info;
-	uint32_t c;
-	u_int o, h;
+	uint32_t	c;
+	u_int		o, h;
 
 	info = vd->vd_softc;
 	c = info->fb_cmap[color];
@@ -250,28 +250,28 @@ vt_fb_blank(struct vt_device *vd, term_color_t color)
 	case 1:
 		for (h = 0; h < info->fb_height; h++)
 			for (o = 0; o < info->fb_stride; o++)
-				vt_fb_mem_wr1(info, h*info->fb_stride + o, c);
+				vt_fb_mem_wr1(info, h * info->fb_stride + o, c);
 		break;
 	case 2:
 		for (h = 0; h < info->fb_height; h++)
 			for (o = 0; o < info->fb_stride - 1; o += 2)
-				vt_fb_mem_wr2(info, h*info->fb_stride + o, c);
+				vt_fb_mem_wr2(info, h * info->fb_stride + o, c);
 		break;
 	case 3:
 		for (h = 0; h < info->fb_height; h++)
 			for (o = 0; o < info->fb_stride - 2; o += 3) {
-				vt_fb_mem_wr1(info, h*info->fb_stride + o,
-				    (c >> 16) & 0xff);
-				vt_fb_mem_wr1(info, h*info->fb_stride + o + 1,
-				    (c >> 8) & 0xff);
-				vt_fb_mem_wr1(info, h*info->fb_stride + o + 2,
-				    c & 0xff);
+				vt_fb_mem_wr1(info, h * info->fb_stride + o,
+					      (c >> 16) & 0xff);
+				vt_fb_mem_wr1(info, h * info->fb_stride + o + 1,
+					      (c >> 8) & 0xff);
+				vt_fb_mem_wr1(info, h * info->fb_stride + o + 2,
+					      c & 0xff);
 			}
 		break;
 	case 4:
 		for (h = 0; h < info->fb_height; h++)
 			for (o = 0; o < info->fb_stride - 3; o += 4)
-				vt_fb_mem_wr4(info, h*info->fb_stride + o, c);
+				vt_fb_mem_wr4(info, h * info->fb_stride + o, c);
 		break;
 	default:
 		/* panic? */
@@ -281,20 +281,20 @@ vt_fb_blank(struct vt_device *vd, term_color_t color)
 
 void
 vt_fb_bitblt_bitmap(struct vt_device *vd, const struct vt_window *vw,
-    const uint8_t *pattern, const uint8_t *mask,
-    unsigned int width, unsigned int height,
-    unsigned int x, unsigned int y, term_color_t fg, term_color_t bg)
+		    const uint8_t * pattern, const uint8_t * mask,
+		    unsigned int width, unsigned int height,
+	   unsigned int x, unsigned int y, term_color_t fg, term_color_t bg)
 {
 	struct fb_info *info;
-	uint32_t fgc, bgc, cc, o;
-	int bpp, bpl, xi, yi;
-	int bit, byte;
+	uint32_t	fgc, bgc, cc, o;
+	int		bpp, bpl, xi, yi;
+	int		bit, byte;
 
 	info = vd->vd_softc;
 	bpp = FBTYPE_GET_BYTESPP(info);
 	fgc = info->fb_cmap[fg];
 	bgc = info->fb_cmap[bg];
-	bpl = (width + 7) / 8; /* Bytes per source line. */
+	bpl = (width + 7) / 8;	/* Bytes per source line. */
 
 	if (info->fb_flags & FB_FLAG_NOWRITE)
 		return;
@@ -323,7 +323,7 @@ vt_fb_bitblt_bitmap(struct vt_device *vd, const struct vt_window *vw,
 			o += vd->vd_transpose;
 			cc = pattern[byte] & bit ? fgc : bgc;
 
-			switch(bpp) {
+			switch (bpp) {
 			case 1:
 				vt_fb_mem_wr1(info, o, cc);
 				break;
@@ -349,29 +349,29 @@ vt_fb_bitblt_bitmap(struct vt_device *vd, const struct vt_window *vw,
 
 void
 vt_fb_bitblt_text(struct vt_device *vd, const struct vt_window *vw,
-    const term_rect_t *area)
+		  const term_rect_t * area)
 {
-	unsigned int col, row, x, y;
+	unsigned int	col, row, x, y;
 	struct vt_font *vf;
-	term_char_t c;
-	term_color_t fg, bg;
-	const uint8_t *pattern;
-	size_t z;
+	term_char_t	c;
+	term_color_t	fg, bg;
+	const		uint8_t *pattern;
+	size_t		z;
 
 	vf = vw->vw_font;
 
 	for (row = area->tr_begin.tp_row; row < area->tr_end.tp_row; ++row) {
 		for (col = area->tr_begin.tp_col; col < area->tr_end.tp_col;
-		    ++col) {
+		     ++col) {
 			x = col * vf->vf_width +
-			    vw->vw_draw_area.tr_begin.tp_col;
+				vw->vw_draw_area.tr_begin.tp_col;
 			y = row * vf->vf_height +
-			    vw->vw_draw_area.tr_begin.tp_row;
+				vw->vw_draw_area.tr_begin.tp_row;
 
 			c = VTBUF_GET_FIELD(&vw->vw_buf, row, col);
 			pattern = vtfont_lookup(vf, c);
 			vt_determine_colors(c,
-			    VTBUF_ISCURSOR(&vw->vw_buf, row, col), &fg, &bg);
+			   VTBUF_ISCURSOR(&vw->vw_buf, row, col), &fg, &bg);
 
 			z = row * PIXEL_WIDTH(VT_FB_MAX_WIDTH) + col;
 			if (z >= PIXEL_HEIGHT(VT_FB_MAX_HEIGHT) *
@@ -383,15 +383,17 @@ vt_fb_bitblt_text(struct vt_device *vd, const struct vt_window *vw,
 				continue;
 
 			if ((NULL == vd->vd_driver) ||
-				(NULL == vd->vd_driver->vd_bitblt_bmp)) {
+			    (NULL == vd->vd_driver->vd_bitblt_bmp)) {
 
-					printf("vt_fb: uninitialized vd_driver->vd_bitblt_bmp\n");
-					vt_fb_bitblt_bitmap(vd, vw, pattern, NULL, vf->vf_width, vf->vf_height, x, y, fg, bg);
+				printf("vt_fb: uninitialized vd_driver->vd_bitblt_bmp\n");
+				vt_fb_bitblt_bitmap(vd, vw, pattern, NULL, vf->vf_width, vf->vf_height, x, y, fg, bg);
 			} else {
-				/* rely on driver instead of direct call, so we can make
-			   	use of a more generic implementation in drm-kmod */
-				vd->vd_driver->vd_bitblt_bmp(vd, vw, pattern, NULL,
-												vf->vf_width, vf->vf_height, x, y, fg, bg);
+				/*
+				 * rely on driver instead of direct call, so
+				 * we can make use of a more generic
+				 * implementation in drm-kmod
+				 */
+				vd->vd_driver->vd_bitblt_bmp(vd, vw, pattern, NULL, vf->vf_width, vf->vf_height, x, y, fg, bg);
 			}
 
 			if (vd->vd_drawn)
@@ -407,7 +409,7 @@ vt_fb_bitblt_text(struct vt_device *vd, const struct vt_window *vw,
 	if (!vd->vd_mshown)
 		return;
 
-	term_rect_t drawn_area;
+	term_rect_t	drawn_area;
 
 	drawn_area.tr_begin.tp_col = area->tr_begin.tp_col * vf->vf_width;
 	drawn_area.tr_begin.tp_row = area->tr_begin.tp_row * vf->vf_height;
@@ -416,36 +418,39 @@ vt_fb_bitblt_text(struct vt_device *vd, const struct vt_window *vw,
 
 	if (vt_is_cursor_in_area(vd, &drawn_area)) {
 		if ((NULL == vd->vd_driver) ||
-			(NULL == vd->vd_driver->vd_bitblt_bmp)) {
+		    (NULL == vd->vd_driver->vd_bitblt_bmp)) {
 			printf("vt_fb: uninitialized vd_driver->vd_bitblt_bmp\n");
 			vt_fb_bitblt_bitmap(vd, vw,
-				vd->vd_mcursor->map, vd->vd_mcursor->mask,
-				vd->vd_mcursor->width, vd->vd_mcursor->height,
-				vd->vd_mx_drawn + vw->vw_draw_area.tr_begin.tp_col,
-				vd->vd_my_drawn + vw->vw_draw_area.tr_begin.tp_row,
-				vd->vd_mcursor_fg, vd->vd_mcursor_bg);
+				  vd->vd_mcursor->map, vd->vd_mcursor->mask,
+			      vd->vd_mcursor->width, vd->vd_mcursor->height,
+			 vd->vd_mx_drawn + vw->vw_draw_area.tr_begin.tp_col,
+			 vd->vd_my_drawn + vw->vw_draw_area.tr_begin.tp_row,
+				      vd->vd_mcursor_fg, vd->vd_mcursor_bg);
 		} else {
-			/* again, make use of generic call instead to simplify drm-kmod */
+			/*
+			 * again, make use of generic call instead to
+			 * simplify drm-kmod
+			 */
 			vd->vd_driver->vd_bitblt_bmp(vd, vw,
-				vd->vd_mcursor->map, vd->vd_mcursor->mask,
-				vd->vd_mcursor->width, vd->vd_mcursor->height,
-				vd->vd_mx_drawn + vw->vw_draw_area.tr_begin.tp_col,
-				vd->vd_my_drawn + vw->vw_draw_area.tr_begin.tp_row,
-				vd->vd_mcursor_fg, vd->vd_mcursor_bg);
+				  vd->vd_mcursor->map, vd->vd_mcursor->mask,
+			      vd->vd_mcursor->width, vd->vd_mcursor->height,
+			 vd->vd_mx_drawn + vw->vw_draw_area.tr_begin.tp_col,
+			 vd->vd_my_drawn + vw->vw_draw_area.tr_begin.tp_row,
+				      vd->vd_mcursor_fg, vd->vd_mcursor_bg);
 		}
 	}
 #endif
 }
 
 void
-vt_fb_invalidate_text(struct vt_device *vd, const term_rect_t *area)
+vt_fb_invalidate_text(struct vt_device *vd, const term_rect_t * area)
 {
-	unsigned int col, row;
-	size_t z;
+	unsigned int	col, row;
+	size_t		z;
 
 	for (row = area->tr_begin.tp_row; row < area->tr_end.tp_row; ++row) {
 		for (col = area->tr_begin.tp_col; col < area->tr_end.tp_col;
-		    ++col) {
+		     ++col) {
 			z = row * PIXEL_WIDTH(VT_FB_MAX_WIDTH) + col;
 			if (z >= PIXEL_HEIGHT(VT_FB_MAX_HEIGHT) *
 			    PIXEL_WIDTH(VT_FB_MAX_WIDTH))
@@ -478,17 +483,17 @@ vt_fb_init_colors(struct fb_info *info)
 	switch (FBTYPE_GET_BPP(info)) {
 	case 8:
 		return (vt_config_cons_colors(info, COLOR_FORMAT_RGB,
-		    0x7, 5, 0x7, 2, 0x3, 0));
+					      0x7, 5, 0x7, 2, 0x3, 0));
 	case 15:
 		return (vt_config_cons_colors(info, COLOR_FORMAT_RGB,
-		    0x1f, 10, 0x1f, 5, 0x1f, 0));
+					      0x1f, 10, 0x1f, 5, 0x1f, 0));
 	case 16:
 		return (vt_config_cons_colors(info, COLOR_FORMAT_RGB,
-		    0x1f, 11, 0x3f, 5, 0x1f, 0));
+					      0x1f, 11, 0x3f, 5, 0x1f, 0));
 	case 24:
-	case 32: /* Ignore alpha. */
+	case 32:		/* Ignore alpha. */
 		return (vt_config_cons_colors(info, COLOR_FORMAT_RGB,
-		    0xff, 16, 0xff, 8, 0xff, 0));
+					      0xff, 16, 0xff, 8, 0xff, 0));
 	default:
 		return (1);
 	}
@@ -498,9 +503,11 @@ int
 vt_fb_init(struct vt_device *vd)
 {
 	struct fb_info *info;
-	u_int margin;
-	int bg, err;
-	term_color_t c;
+	u_int		margin;
+	int		bg, err;
+	term_color_t	c;
+
+	printf("vt_fb_init: started\n");
 
 	info = vd->vd_softc;
 	vd->vd_height = MIN(VT_FB_MAX_HEIGHT, info->fb_height);
@@ -531,12 +538,13 @@ vt_fb_init(struct vt_device *vd)
 		c = bg;
 	}
 	/* Clear the screen. */
+	printf("vt_fb: calling driver vd_blank\n");
 	vd->vd_driver->vd_blank(vd, c);
 
 	/* Wakeup screen. KMS need this. */
 	if ((NULL == vd->vd_driver) ||
-		(NULL == vd->vd_driver->vd_postswitch)) {
-		
+	    (NULL == vd->vd_driver->vd_postswitch)) {
+
 		printf("vt_fb: uninitialized vd_driver->vd_postswitch\n");
 		vt_fb_postswitch(vd);
 	} else {
@@ -544,8 +552,12 @@ vt_fb_init(struct vt_device *vd)
 			printf("vt_fb: postswitch vtable not going to vt_fb_postswitch\n");
 		}
 
+		printf("vt_fb: calling driver vd_postswitch\n");
+
 		vd->vd_driver->vd_postswitch(vd);
 	}
+
+	printf("vt_fb: vt_fb_init completed\n");
 
 	return (CN_INTERNAL);
 }
@@ -560,7 +572,7 @@ vt_fb_fini(struct vt_device *vd, void *softc)
 int
 vt_fb_attach(struct fb_info *info)
 {
-	int ret;
+	int		ret;
 
 	ret = vt_allocate(&vt_fb_driver, info);
 
@@ -570,7 +582,7 @@ vt_fb_attach(struct fb_info *info)
 int
 vt_fb_detach(struct fb_info *info)
 {
-	int ret;
+	int		ret;
 
 	ret = vt_deallocate(&vt_fb_driver, info);
 
