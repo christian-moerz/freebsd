@@ -34,6 +34,7 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/asan.h>
 #include <sys/buf.h>
 #include <sys/bus.h>
 #include <sys/cons.h>
@@ -356,10 +357,10 @@ makectx(struct trapframe *tf, struct pcb *pcb)
 	int i;
 
 	for (i = 0; i < nitems(pcb->pcb_x); i++)
-		pcb->pcb_x[i] = tf->tf_x[i];
+		pcb->pcb_x[i] = tf->tf_x[i + PCB_X_START];
 
-	/* NB: pcb_lr is the PC, see PC_REGS() in db_machdep.h */
-	pcb->pcb_lr = tf->tf_elr;
+	/* NB: pcb_x[PCB_LR] is the PC, see PC_REGS() in db_machdep.h */
+	pcb->pcb_x[PCB_LR] = tf->tf_elr;
 	pcb->pcb_sp = tf->tf_sp;
 }
 
@@ -455,36 +456,25 @@ foreach_efi_map_entry(struct efi_map_header *efihdr, efi_map_entry_cb cb, void *
 	}
 }
 
+/*
+ * Handle the EFI memory map list.
+ *
+ * We will make two passes at this, the first (exclude == false) to populate
+ * physmem with valid physical memory ranges from recognized map entry types.
+ * In the second pass we will exclude memory ranges from physmem which must not
+ * be used for general allocations, either because they are used by runtime
+ * firmware or otherwise reserved.
+ *
+ * Adding the runtime-reserved memory ranges to physmem and excluding them
+ * later ensures that they are included in the DMAP, but excluded from
+ * phys_avail[].
+ *
+ * Entry types not explicitly listed here are ignored and not mapped.
+ */
 static void
-exclude_efi_map_entry(struct efi_md *p, void *argp __unused)
+handle_efi_map_entry(struct efi_md *p, void *argp)
 {
-
-	switch (p->md_type) {
-	case EFI_MD_TYPE_CODE:
-	case EFI_MD_TYPE_DATA:
-	case EFI_MD_TYPE_BS_CODE:
-	case EFI_MD_TYPE_BS_DATA:
-	case EFI_MD_TYPE_FREE:
-		/*
-		 * We're allowed to use any entry with these types.
-		 */
-		break;
-	default:
-		physmem_exclude_region(p->md_phys, p->md_pages * EFI_PAGE_SIZE,
-		    EXFLAG_NOALLOC);
-	}
-}
-
-static void
-exclude_efi_map_entries(struct efi_map_header *efihdr)
-{
-
-	foreach_efi_map_entry(efihdr, exclude_efi_map_entry, NULL);
-}
-
-static void
-add_efi_map_entry(struct efi_md *p, void *argp __unused)
-{
+	bool exclude = *(bool *)argp;
 
 	switch (p->md_type) {
 	case EFI_MD_TYPE_RECLAIM:
@@ -496,7 +486,7 @@ add_efi_map_entry(struct efi_md *p, void *argp __unused)
 		/*
 		 * Some UEFI implementations put the system table in the
 		 * runtime code section. Include it in the DMAP, but will
-		 * be excluded from phys_avail later.
+		 * be excluded from phys_avail.
 		 */
 	case EFI_MD_TYPE_RT_DATA:
 		/*
@@ -504,6 +494,12 @@ add_efi_map_entry(struct efi_md *p, void *argp __unused)
 		 * region is created to stop it from being added
 		 * to phys_avail.
 		 */
+		if (exclude) {
+			physmem_exclude_region(p->md_phys,
+			    p->md_pages * EFI_PAGE_SIZE, EXFLAG_NOALLOC);
+			break;
+		}
+		/* FALLTHROUGH */
 	case EFI_MD_TYPE_CODE:
 	case EFI_MD_TYPE_DATA:
 	case EFI_MD_TYPE_BS_CODE:
@@ -512,8 +508,12 @@ add_efi_map_entry(struct efi_md *p, void *argp __unused)
 		/*
 		 * We're allowed to use any entry with these types.
 		 */
-		physmem_hardware_region(p->md_phys,
-		    p->md_pages * EFI_PAGE_SIZE);
+		if (!exclude)
+			physmem_hardware_region(p->md_phys,
+			    p->md_pages * EFI_PAGE_SIZE);
+		break;
+	default:
+		/* Other types shall not be handled by physmem. */
 		break;
 	}
 }
@@ -521,7 +521,15 @@ add_efi_map_entry(struct efi_md *p, void *argp __unused)
 static void
 add_efi_map_entries(struct efi_map_header *efihdr)
 {
-	foreach_efi_map_entry(efihdr, add_efi_map_entry, NULL);
+	bool exclude = false;
+	foreach_efi_map_entry(efihdr, handle_efi_map_entry, &exclude);
+}
+
+static void
+exclude_efi_map_entries(struct efi_map_header *efihdr)
+{
+	bool exclude = true;
+	foreach_efi_map_entry(efihdr, handle_efi_map_entry, &exclude);
 }
 
 static void
@@ -948,6 +956,18 @@ initarm(struct arm64_bootparams *abp)
 	/*  Do the same for reserve entries in the EFI MEMRESERVE table */
 	if (efi_systbl_phys != 0)
 		exclude_efi_memreserve(efi_systbl_phys);
+
+	/*
+	 * We carefully bootstrap the sanitizer map after we've excluded
+	 * absolutely everything else that could impact phys_avail.  There's not
+	 * always enough room for the initial shadow map after the kernel, so
+	 * we'll end up searching for segments that we can safely use.  Those
+	 * segments also get excluded from phys_avail.
+	 */
+#if defined(KASAN)
+	pmap_bootstrap_san(KERNBASE - abp->kern_delta);
+#endif
+
 	physmem_init_kernel_globals();
 
 	devmap_bootstrap(0, NULL);
@@ -991,6 +1011,7 @@ initarm(struct arm64_bootparams *abp)
 	pan_enable();
 
 	kcsan_cpu_init(0);
+	kasan_init();
 
 	env = kern_getenv("kernelname");
 	if (env != NULL)

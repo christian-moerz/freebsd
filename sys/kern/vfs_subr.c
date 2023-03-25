@@ -287,7 +287,6 @@ SYSCTL_INT(_debug, OID_AUTO, rush_requests, CTLFLAG_RW, &stat_rush_requests, 0,
 #define	VDBATCH_SIZE 8
 struct vdbatch {
 	u_int index;
-	long freevnodes;
 	struct mtx lock;
 	struct vnode *tab[VDBATCH_SIZE];
 };
@@ -1418,48 +1417,62 @@ static int vnlruproc_sig;
  * at any given moment can still exceed slop, but it should not be by significant
  * margin in practice.
  */
-#define VNLRU_FREEVNODES_SLOP 128
+#define VNLRU_FREEVNODES_SLOP 126
+
+static void __noinline
+vfs_freevnodes_rollup(int8_t *lfreevnodes)
+{
+
+	atomic_add_long(&freevnodes, *lfreevnodes);
+	*lfreevnodes = 0;
+	critical_exit();
+}
 
 static __inline void
 vfs_freevnodes_inc(void)
 {
-	struct vdbatch *vd;
+	int8_t *lfreevnodes;
 
 	critical_enter();
-	vd = DPCPU_PTR(vd);
-	vd->freevnodes++;
-	critical_exit();
+	lfreevnodes = PCPU_PTR(vfs_freevnodes);
+	(*lfreevnodes)++;
+	if (__predict_false(*lfreevnodes == VNLRU_FREEVNODES_SLOP))
+		vfs_freevnodes_rollup(lfreevnodes);
+	else
+		critical_exit();
 }
 
 static __inline void
 vfs_freevnodes_dec(void)
 {
-	struct vdbatch *vd;
+	int8_t *lfreevnodes;
 
 	critical_enter();
-	vd = DPCPU_PTR(vd);
-	vd->freevnodes--;
-	critical_exit();
+	lfreevnodes = PCPU_PTR(vfs_freevnodes);
+	(*lfreevnodes)--;
+	if (__predict_false(*lfreevnodes == -VNLRU_FREEVNODES_SLOP))
+		vfs_freevnodes_rollup(lfreevnodes);
+	else
+		critical_exit();
 }
 
 static u_long
 vnlru_read_freevnodes(void)
 {
-	struct vdbatch *vd;
-	long slop;
+	long slop, rfreevnodes;
 	int cpu;
 
-	mtx_assert(&vnode_list_mtx, MA_OWNED);
-	if (freevnodes > freevnodes_old)
-		slop = freevnodes - freevnodes_old;
+	rfreevnodes = atomic_load_long(&freevnodes);
+
+	if (rfreevnodes > freevnodes_old)
+		slop = rfreevnodes - freevnodes_old;
 	else
-		slop = freevnodes_old - freevnodes;
+		slop = freevnodes_old - rfreevnodes;
 	if (slop < VNLRU_FREEVNODES_SLOP)
-		return (freevnodes >= 0 ? freevnodes : 0);
-	freevnodes_old = freevnodes;
+		return (rfreevnodes >= 0 ? rfreevnodes : 0);
+	freevnodes_old = rfreevnodes;
 	CPU_FOREACH(cpu) {
-		vd = DPCPU_ID_PTR((cpu), vd);
-		freevnodes_old += vd->freevnodes;
+		freevnodes_old += cpuid_to_pcpu[cpu]->pc_vfs_freevnodes;
 	}
 	return (freevnodes_old >= 0 ? freevnodes_old : 0);
 }
@@ -3513,7 +3526,6 @@ vdbatch_process(struct vdbatch *vd)
 
 	mtx_lock(&vnode_list_mtx);
 	critical_enter();
-	freevnodes += vd->freevnodes;
 	for (i = 0; i < VDBATCH_SIZE; i++) {
 		vp = vd->tab[i];
 		TAILQ_REMOVE(&vnode_list, vp, v_vnodelist);
@@ -3522,7 +3534,6 @@ vdbatch_process(struct vdbatch *vd)
 		vp->v_dbatchcpu = NOCPU;
 	}
 	mtx_unlock(&vnode_list_mtx);
-	vd->freevnodes = 0;
 	bzero(vd->tab, sizeof(vd->tab));
 	vd->index = 0;
 	critical_exit();
@@ -4703,103 +4714,6 @@ sysctl_ovfs_conf(SYSCTL_HANDLER_ARGS)
 
 #endif /* 1 || COMPAT_PRELITE2 */
 #endif /* !BURN_BRIDGES */
-
-#define KINFO_VNODESLOP		10
-#ifdef notyet
-/*
- * Dump vnode list (via sysctl).
- */
-/* ARGSUSED */
-static int
-sysctl_vnode(SYSCTL_HANDLER_ARGS)
-{
-	struct xvnode *xvn;
-	struct mount *mp;
-	struct vnode *vp;
-	int error, len, n;
-
-	/*
-	 * Stale numvnodes access is not fatal here.
-	 */
-	req->lock = 0;
-	len = (numvnodes + KINFO_VNODESLOP) * sizeof *xvn;
-	if (!req->oldptr)
-		/* Make an estimate */
-		return (SYSCTL_OUT(req, 0, len));
-
-	error = sysctl_wire_old_buffer(req, 0);
-	if (error != 0)
-		return (error);
-	xvn = malloc(len, M_TEMP, M_ZERO | M_WAITOK);
-	n = 0;
-	mtx_lock(&mountlist_mtx);
-	TAILQ_FOREACH(mp, &mountlist, mnt_list) {
-		if (vfs_busy(mp, MBF_NOWAIT | MBF_MNTLSTLOCK))
-			continue;
-		MNT_ILOCK(mp);
-		TAILQ_FOREACH(vp, &mp->mnt_nvnodelist, v_nmntvnodes) {
-			if (n == len)
-				break;
-			vref(vp);
-			xvn[n].xv_size = sizeof *xvn;
-			xvn[n].xv_vnode = vp;
-			xvn[n].xv_id = 0;	/* XXX compat */
-#define XV_COPY(field) xvn[n].xv_##field = vp->v_##field
-			XV_COPY(usecount);
-			XV_COPY(writecount);
-			XV_COPY(holdcnt);
-			XV_COPY(mount);
-			XV_COPY(numoutput);
-			XV_COPY(type);
-#undef XV_COPY
-			xvn[n].xv_flag = vp->v_vflag;
-
-			switch (vp->v_type) {
-			case VREG:
-			case VDIR:
-			case VLNK:
-				break;
-			case VBLK:
-			case VCHR:
-				if (vp->v_rdev == NULL) {
-					vrele(vp);
-					continue;
-				}
-				xvn[n].xv_dev = dev2udev(vp->v_rdev);
-				break;
-			case VSOCK:
-				xvn[n].xv_socket = vp->v_socket;
-				break;
-			case VFIFO:
-				xvn[n].xv_fifo = vp->v_fifoinfo;
-				break;
-			case VNON:
-			case VBAD:
-			default:
-				/* shouldn't happen? */
-				vrele(vp);
-				continue;
-			}
-			vrele(vp);
-			++n;
-		}
-		MNT_IUNLOCK(mp);
-		mtx_lock(&mountlist_mtx);
-		vfs_unbusy(mp);
-		if (n == len)
-			break;
-	}
-	mtx_unlock(&mountlist_mtx);
-
-	error = SYSCTL_OUT(req, xvn, n * sizeof *xvn);
-	free(xvn, M_TEMP);
-	return (error);
-}
-
-SYSCTL_PROC(_kern, KERN_VNODE, vnode, CTLTYPE_OPAQUE | CTLFLAG_RD |
-    CTLFLAG_MPSAFE, 0, 0, sysctl_vnode, "S,xvnode",
-    "");
-#endif
 
 static void
 unmount_or_warn(struct mount *mp)

@@ -18,4 +18,6 @@ struct qemu_fwcfg_item {
 	uint8_t *data;
 };
 
+int qemu_fwcfg_add_file(const char *name,
+    const uint32_t size, void *const data);
 int qemu_fwcfg_init(struct vmctx *const ctx);
