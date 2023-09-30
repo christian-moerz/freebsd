@@ -1,6 +1,6 @@
 Branch "framework12"
 --------------------
-This is the framework12 branch fork of the FreeBSD main line code to work in conjunction with recent drm-kmod updates to support 12th gen Intel CPUs and integrated graphics under FreeBSD 14-BETA4 (or later).
+This is the framework12 branch fork of the FreeBSD main line code to work in conjunction with recent drm-kmod updates to support 12th gen Intel CPUs and integrated graphics under FreeBSD 14-BETA4 (or later) with a specific focus on frame.work notebooks (see https://frame.work).
 
 FreeBSD Source:
 ---------------
